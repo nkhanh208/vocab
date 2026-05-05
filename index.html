@@ -166,6 +166,7 @@ a{text-decoration:none;color:inherit}
   background:linear-gradient(135deg,var(--green-ll),var(--blue-l));
   border:1px solid var(--green-l);border-radius:var(--radius-sm);
   padding:10px 16px;margin-bottom:18px;font-size:13px;font-weight:700;color:var(--green-d);
+  flex-wrap: wrap; gap: 10px;
 }
 [data-theme="dark"] .topic-banner{background:linear-gradient(135deg,var(--green-ll),#0c1a2e);border-color:var(--green-l);color:var(--green)}
 
@@ -282,11 +283,11 @@ a{text-decoration:none;color:inherit}
 .btn-export:hover{transform:scale(1.03)}
 .btn-import{
   padding:8px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border);
-  font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;
-  position:relative;transition:all var(--transition);background:var(--surface);
+  font-size:12px;font-weight:700;color:var(--text);cursor:pointer;
+  position:relative;transition:all var(--transition);background:var(--surface2);
+  display:inline-flex; align-items:center; gap:6px;
 }
-.btn-import:hover{background:var(--surface2);border-color:var(--border2)}
-.btn-import input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.btn-import:hover{background:var(--surface3);border-color:var(--border2)}
 
 /* ════════════════════════════════
    STUDY SHELL
@@ -512,7 +513,7 @@ a{text-decoration:none;color:inherit}
 .chart-bar-lbl{font-size:9px;color:var(--muted);font-weight:700}
 
 /* ════════════════════════════════
-   EDIT MODAL
+   MODALS (EDIT & CONFIRM)
 ════════════════════════════════ */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
 .modal-overlay.show{display:flex}
@@ -774,7 +775,7 @@ a{text-decoration:none;color:inherit}
       <!-- Export/Import -->
       <div class="export-bar">
         <button class="btn-export ripple-host" onclick="exportVocab();addRipple(event,this)">💾 Xuất JSON</button>
-        <label class="btn-import">📂 Import File <input type="file" accept=".json, .js" onchange="importJSON(this.files[0])"/></label>
+        <button class="btn-import ripple-host" onclick="openImportModal();addRipple(event,this)">📂 Import / Paste Từ Vựng</button>
         <span style="font-size:12px;color:var(--muted);font-weight:600" id="vocabCount">0 từ vựng</span>
       </div>
 
@@ -919,7 +920,7 @@ a{text-decoration:none;color:inherit}
             <div class="fill-sentence" id="fb-sentence"></div>
             <div class="fill-vi" id="fb-vi"></div>
             <div class="fill-input-wrap">
-              <input class="fill-input" id="fb-input" placeholder="Nhập từ..." onkeydown="if(event.key==='Enter'){if(S.fb.answered)nextFB();else checkFB()}"/>
+              <input class="fill-input" id="fb-input" placeholder="Nhập từ..." onkeydown="if(event.key==='Enter'){if(window.S.fb.answered)nextFB();else checkFB()}"/>
               <button class="fill-check-btn ripple-host" onclick="checkFB();addRipple(event,this)">Kiểm tra</button>
             </div>
             <div class="fill-hint" id="fb-hint"></div>
@@ -990,7 +991,7 @@ a{text-decoration:none;color:inherit}
             <div class="type-vi" id="tp-vi"></div>
             <div class="type-pron" id="tp-pron"></div>
             <div class="type-input-wrap">
-              <input class="type-input" id="tp-input" placeholder="Nhập tiếng Anh..." onkeydown="if(event.key==='Enter'){if(S.tp.answered)nextTP();else checkTP()}"/>
+              <input class="type-input" id="tp-input" placeholder="Nhập tiếng Anh..." onkeydown="if(event.key==='Enter'){if(window.S.tp.answered)nextTP();else checkTP()}"/>
               <div class="type-hint-chars" id="tp-hint-chars"></div>
               <div class="type-result" id="tp-result"></div>
               <div style="display:flex;gap:8px">
@@ -1055,15 +1056,59 @@ a{text-decoration:none;color:inherit}
   </div>
 </div>
 
-<script>
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box" style="max-width:400px;text-align:center;">
+    <div style="font-size:40px;margin-bottom:10px">⚠️</div>
+    <div class="modal-title" style="justify-content:center" id="confirmModalTitle">Xác nhận</div>
+    <div style="font-size:14px;color:var(--muted);margin-bottom:20px" id="confirmModalText">Bạn có chắc chắn muốn thực hiện hành động này?</div>
+    <div class="modal-actions" style="justify-content:center">
+      <button class="btn-del-word" id="confirmYesBtn">🗑️ Xoá</button>
+      <button class="btn-cancel" onclick="document.getElementById('confirmModal').classList.remove('show')">Huỷ</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>📂 Import & Paste Từ Vựng</span>
+      <div class="modal-close" onclick="closeImportModal()">✕</div>
+    </div>
+    <div class="form-grid">
+      <div class="ff full">
+        <label>Chủ đề (Topic) cho từ vựng *</label>
+        <input id="import-topic" list="topic-list" placeholder="Chọn chủ đề CÓ SẴN hoặc gõ tên MỚI..." />
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Bỏ trống nếu muốn lấy topic mặc định từ file/text.</div>
+      </div>
+      
+      <div class="ff full" style="margin-top:10px">
+        <label>Cách 1: Dán trực tiếp dữ liệu (JSON/JS) vào đây</label>
+        <textarea id="import-text" placeholder='[\n  {\n    "word": "resilient",\n    "meaning": "kiên cường"\n  }\n]' style="min-height:120px"></textarea>
+        <button class="btn-save" style="margin-top:8px" onclick="importPastedData()">📥 Import Text</button>
+      </div>
+
+      <div class="ff full" style="text-align:center;color:var(--muted);font-size:12px;font-weight:800;margin:10px 0">HOẶC</div>
+
+      <div class="ff full">
+        <label>Cách 2: Tải file lên (.json, .js)</label>
+        <input type="file" id="import-file" accept=".json, .js" onchange="importFile(this.files[0])" style="padding:0;border:none;background:transparent;box-shadow:none" />
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
 // ═══════════════════════════════════════
-// SAMPLE DATA
+// SAMPLE DATA & STATE
 // ═══════════════════════════════════════
 let VOCAB = [];
 
-// ═══════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════
 const S = {
   streak:1, learned:0,
   acc:{correct:0, total:0},
@@ -1077,6 +1122,7 @@ const S = {
   tp:{cards:[],idx:0,correct:0,wrong:0,hintCount:0,answered:false},
   activeTopic:'',
 };
+window.S = S;
 
 // ═══════════════════════════════════════
 // ACHIEVEMENTS DEFINITION
@@ -1093,7 +1139,28 @@ const ACHIEVEMENTS = [
 ];
 
 // ═══════════════════════════════════════
-// DARK MODE
+// CUSTOM CONFIRM
+// ═══════════════════════════════════════
+let resolveConfirm = null;
+function customConfirm(title, text) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalText').textContent = text;
+        
+        const yesBtn = document.getElementById('confirmYesBtn');
+        yesBtn.onclick = () => {
+            modal.classList.remove('show');
+            resolve(true);
+        };
+        resolveConfirm = resolve;
+        modal.classList.add('show');
+    });
+}
+window.customConfirm = customConfirm;
+
+// ═══════════════════════════════════════
+// DARK MODE & SIDEBAR
 // ═══════════════════════════════════════
 function toggleDark(){
   const html=document.documentElement;
@@ -1110,9 +1177,6 @@ function initTheme(){
   document.getElementById('darkBtn').textContent=theme==='dark'?'☀️':'🌙';
 }
 
-// ═══════════════════════════════════════
-// SIDEBAR MOBILE
-// ═══════════════════════════════════════
 function toggleSidebar(){
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebarOverlay').classList.toggle('open');
@@ -1206,7 +1270,7 @@ function speak(txt){
 if('speechSynthesis'in window){speechSynthesis.getVoices();speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices()}
 
 // ═══════════════════════════════════════
-// TOAST
+// TOAST & ANIMATIONS
 // ═══════════════════════════════════════
 function toast(msg,type){
   if(!type){type=msg.startsWith('✅')||msg.startsWith('🎉')?'ok':msg.startsWith('❌')||msg.startsWith('⚠️')?'err':'info'}
@@ -1216,9 +1280,6 @@ function toast(msg,type){
   t._t=setTimeout(()=>t.classList.remove('show'),2800);
 }
 
-// ═══════════════════════════════════════
-// RIPPLE
-// ═══════════════════════════════════════
 function addRipple(e,el){
   const r=document.createElement('span');r.className='ripple-dot';
   const rect=el.getBoundingClientRect();
@@ -1226,9 +1287,6 @@ function addRipple(e,el){
   el.appendChild(r);setTimeout(()=>r.remove(),600);
 }
 
-// ═══════════════════════════════════════
-// CONFETTI
-// ═══════════════════════════════════════
 function confetti(n=40){
   const wrap=document.getElementById('confettiWrap');
   const colors=['#22c55e','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4'];
@@ -1241,7 +1299,7 @@ function confetti(n=40){
 }
 
 // ═══════════════════════════════════════
-// TOPBAR UPDATE
+// UI UPDATES
 // ═══════════════════════════════════════
 function updateTopbar(){
   document.getElementById('streakNum').textContent=S.streak;
@@ -1255,9 +1313,6 @@ function updateTopbar(){
   document.getElementById('navTotal').textContent=VOCAB.length;
 }
 
-// ═══════════════════════════════════════
-// PROGRESS CHART
-// ═══════════════════════════════════════
 function renderProgressChart(){
   const chart=document.getElementById('progressChart');
   const days=['T2','T3','T4','T5','T6','T7','CN'];
@@ -1275,9 +1330,6 @@ function renderProgressChart(){
   }).join('');
 }
 
-// ═══════════════════════════════════════
-// TOPICS SIDEBAR
-// ═══════════════════════════════════════
 const TC=['#22c55e','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#ec4899','#14b8a6','#f97316','#84cc16'];
 function renderTopics(){
   const topics=[...new Set(VOCAB.map(w=>w.topic))];
@@ -1290,23 +1342,29 @@ function renderTopics(){
         <span class="tc-cnt">${cnt}</span>
       </div>`;
     }).join('');
-  // update selects
+  
   const sel=document.getElementById('wordTopicFilter');
   if(sel){sel.innerHTML='<option value="">🏷️ Chủ đề</option>'+topics.map(t=>`<option value="${t}">${t}</option>`).join('')}
-  // topic datalist
+  
   const dl=document.getElementById('topic-list');
   if(dl)dl.innerHTML=topics.map(t=>`<option value="${t}">`).join('');
-  // banners
+  
   ['topicBanner','topicBanner2'].forEach(bid=>{
     const b=document.getElementById(bid);
     if(!b)return;
     if(S.activeTopic){
       const n=VOCAB.filter(w=>w.topic===S.activeTopic).length;
-      b.innerHTML=`<span>🏷️ Chủ đề: <strong>${S.activeTopic}</strong> — ${n} từ</span><button onclick="setTopic('')" style="background:rgba(255,255,255,.3);border:none;border-radius:6px;padding:2px 8px;cursor:pointer;font-size:12px;font-weight:800;color:inherit">✕</button>`;
+      b.innerHTML=`
+        <span style="display:flex;align-items:center;gap:8px">🏷️ Chủ đề: <strong>${S.activeTopic}</strong> — ${n} từ</span>
+        <div style="display:flex;gap:6px">
+          <button onclick="deleteTopicWords('${S.activeTopic.replace(/'/g,"\\'")}')" style="background:var(--red);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:800;color:#fff;box-shadow:0 2px 6px rgba(239,68,68,0.3)">🗑️ Xoá chủ đề</button>
+          <button onclick="setTopic('')" style="background:rgba(255,255,255,.3);border:none;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-weight:800;color:inherit">✕ Hủy lọc</button>
+        </div>`;
       b.style.display='flex';
     }else{b.style.display='none'}
   });
 }
+
 function setTopic(t){
   S.activeTopic=(S.activeTopic===t)?'':t;
   renderTopics();updateModeWordCount();
@@ -1314,14 +1372,12 @@ function setTopic(t){
   sfxClick();
 }
 
-// ═══════════════════════════════════════
-// WORD TABLE
-// ═══════════════════════════════════════
 function lvTag(lv){
   const m={beginner:'lv-b',intermediate:'lv-i',advanced:'lv-a'};
   const l={beginner:'Cơ bản',intermediate:'Trung cấp',advanced:'Nâng cao'};
   return`<span class="tag ${m[lv]||''}">${l[lv]||lv}</span>`;
 }
+
 function renderWordTable(){
   const search=(document.getElementById('wordSearch')?.value||'').toLowerCase();
   const topic=document.getElementById('wordTopicFilter')?.value||'';
@@ -1358,33 +1414,130 @@ function renderWordTable(){
   </table></div>`;
 }
 
+// ═══════════════════════════════════════
+// CRUD (THÊM, SỬA, XÓA) & FIREBASE
+// ═══════════════════════════════════════
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'vocalearn-app';
+
+let app, auth, db, currentUser = null;
+let unsubscribeVocab = null;
+
+async function initFirebase() {
+    if (!firebaseConfig || !firebaseConfig.projectId) {
+        console.warn("Chưa cấu hình Firebase, sử dụng lưu trữ cục bộ (Local Storage).");
+        loadVocabLocal();
+        loadState();
+        initialRender();
+        return;
+    }
+    
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+
+    onAuthStateChanged(auth, (user) => {
+        currentUser = user;
+        if (user) {
+            setupFirestoreListeners();
+        } else {
+            if (unsubscribeVocab) unsubscribeVocab();
+        }
+    });
+
+    try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+            await signInAnonymously(auth);
+        }
+    } catch (e) {
+        console.error("Lỗi đăng nhập:", e);
+        loadVocabLocal();
+        loadState();
+        initialRender();
+    }
+}
+
+function initialRender() {
+    renderTopics();
+    renderWordTable();
+    updateTopbar();
+    renderProgressChart();
+    updateModeWordCount();
+    checkAchievements();
+}
+
+function setupFirestoreListeners() {
+    if (!currentUser) return;
+    
+    // Đồng bộ từ vựng
+    const vocabRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'vocab');
+    unsubscribeVocab = onSnapshot(vocabRef, (snapshot) => {
+        VOCAB = [];
+        snapshot.forEach(doc => {
+            VOCAB.push({ id: doc.id, ...doc.data() });
+        });
+        initialRender();
+    }, (error) => {
+        console.error("Lỗi tải từ vựng:", error);
+    });
+
+    // Đồng bộ trạng thái học tập
+    const stateRef = doc(db, 'artifacts', appId, 'users', currentUser.uid, 'settings', 'state');
+    onSnapshot(stateRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const p = docSnap.data();
+            Object.assign(S, {
+                streak: p.streak || 1,
+                learned: p.learned || 0,
+                acc: p.acc || {correct: 0, total: 0},
+                reviews: p.reviews || {},
+                dailyProgress: p.dailyProgress || {}
+            });
+            updateTopbar();
+            renderProgressChart();
+            checkAchievements();
+        }
+    }, (error) => {
+         console.error("Lỗi tải tiến độ:", error);
+    });
+}
+
 function toggleAddForm(el){
   const fields=document.getElementById('addWordFields');
   el.classList.toggle('open');
   fields.classList.toggle('open');
 }
-function addNewWord(){
+
+async function addNewWord(){
   const word=document.getElementById('aw-word').value.trim().toLowerCase();
   const meaning=document.getElementById('aw-meaning').value.trim();
   const topic=document.getElementById('aw-topic').value.trim();
   if(!word||!meaning||!topic){toast('⚠️ Cần điền: Từ, Nghĩa, Chủ đề');return}
   const id='w_'+Date.now();
-  VOCAB.push({
-    id,word,meaning,topic,
+  const wordObj = {
+    word,meaning,topic,
     pron:document.getElementById('aw-pron').value.trim(),
     level:document.getElementById('aw-level').value,
     synonyms:'',
     ex_en:document.getElementById('aw-exen').value.trim(),
     ex_vi:document.getElementById('aw-exvi').value.trim(),
-  });
-  ['aw-word','aw-pron','aw-meaning','aw-exen','aw-exvi'].forEach(i=>document.getElementById(i).value='');
-  toast('✅ Đã thêm "'+word+'"');
-  saveVocabLocal();renderWordTable();renderTopics();updateTopbar();checkAchievements();
+  };
+
+  if (currentUser) {
+      await setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'vocab', id), wordObj);
+      toast('✅ Đã thêm "'+word+'"');
+      ['aw-word','aw-pron','aw-meaning','aw-exen','aw-exvi'].forEach(i=>document.getElementById(i).value='');
+  } else {
+      wordObj.id = id;
+      VOCAB.push(wordObj);
+      ['aw-word','aw-pron','aw-meaning','aw-exen','aw-exvi'].forEach(i=>document.getElementById(i).value='');
+      toast('✅ Đã thêm "'+word+'"');
+      saveVocabLocal();renderWordTable();renderTopics();updateTopbar();checkAchievements();
+  }
 }
 
-// ═══════════════════════════════════════
-// EDIT MODAL
-// ═══════════════════════════════════════
 let _editId=null;
 function openEdit(id){
   const w=VOCAB.find(x=>x.id===id);if(!w)return;
@@ -1402,29 +1555,101 @@ function openEdit(id){
   document.getElementById('editModal').classList.add('show');
 }
 function closeEdit(){document.getElementById('editModal').classList.remove('show');_editId=null}
-function saveEdit(){
+
+async function saveEdit(){
   const word=document.getElementById('ef-word').value.trim().toLowerCase();
   const meaning=document.getElementById('ef-meaning').value.trim();
   const topic=document.getElementById('ef-topic').value.trim();
   if(!word||!meaning||!topic){toast('⚠️ Cần điền đủ thông tin');return}
   if(_editId){
-    const idx=VOCAB.findIndex(x=>x.id===_editId);
-    if(idx!==-1){
-      VOCAB[idx]={...VOCAB[idx],word,pron:document.getElementById('ef-pron').value.trim(),meaning,topic,level:document.getElementById('ef-level').value,synonyms:document.getElementById('ef-syn').value.trim(),ex_en:document.getElementById('ef-exen').value.trim(),ex_vi:document.getElementById('ef-exvi').value.trim()};
-      toast('✅ Đã cập nhật "'+word+'"');
+    const wordObj = {
+        word,
+        pron:document.getElementById('ef-pron').value.trim(),
+        meaning,
+        topic,
+        level:document.getElementById('ef-level').value,
+        synonyms:document.getElementById('ef-syn').value.trim(),
+        ex_en:document.getElementById('ef-exen').value.trim(),
+        ex_vi:document.getElementById('ef-exvi').value.trim()
+    };
+    if (currentUser) {
+        await setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'vocab', _editId), wordObj, {merge:true});
+        toast('✅ Đã cập nhật "'+word+'"');
+    } else {
+        const idx=VOCAB.findIndex(x=>x.id===_editId);
+        if(idx!==-1){
+          VOCAB[idx]={...VOCAB[idx], ...wordObj};
+          toast('✅ Đã cập nhật "'+word+'"');
+        }
+        saveVocabLocal();renderWordTable();renderTopics();
     }
   }
-  closeEdit();saveVocabLocal();renderWordTable();renderTopics();
+  closeEdit();
 }
-function deleteWord(id){
+
+async function deleteWord(id){
   const w=VOCAB.find(x=>x.id===id);
-  if(!confirm('Xoá từ "'+( w?.word||id)+'"?'))return;
-  VOCAB.splice(VOCAB.findIndex(x=>x.id===id),1);
-  toast('🗑️ Đã xoá "'+( w?.word||'')+ '"');
-  saveVocabLocal();renderWordTable();renderTopics();updateTopbar();
+  const ok = await customConfirm('Xoá từ vựng', 'Bạn có chắc chắn muốn xoá từ "'+( w?.word||id)+'"?');
+  if(!ok) return;
+
+  if (currentUser) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'vocab', id));
+      toast('🗑️ Đã xoá "'+( w?.word||'')+ '"');
+  } else {
+      VOCAB.splice(VOCAB.findIndex(x=>x.id===id),1);
+      toast('🗑️ Đã xoá "'+( w?.word||'')+ '"');
+      saveVocabLocal();renderWordTable();renderTopics();updateTopbar();
+  }
 }
-function deleteEditWord(){if(_editId){closeEdit();deleteWord(_editId)}}
-document.addEventListener('click',e=>{if(e.target===document.getElementById('editModal'))closeEdit()});
+
+async function deleteEditWord(){
+    if(_editId){
+        const idToDelete = _editId;
+        closeEdit();
+        await deleteWord(idToDelete);
+    }
+}
+
+async function deleteTopicWords(topic) {
+  const wordsToDelete = VOCAB.filter(w => w.topic === topic);
+  if (!wordsToDelete.length) return;
+
+  const ok = await customConfirm(
+    'Xoá chủ đề', 
+    `Bạn có chắc chắn muốn xoá toàn bộ ${wordsToDelete.length} từ vựng trong chủ đề "${topic}" không? Hành động này không thể hoàn tác!`
+  );
+  if (!ok) return;
+
+  if (currentUser) {
+    toast('⏳ Đang xoá dữ liệu...');
+    try {
+      const deletePromises = wordsToDelete.map(w => 
+        deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'vocab', w.id))
+      );
+      await Promise.all(deletePromises);
+      toast(`🗑️ Đã xoá toàn bộ ${wordsToDelete.length} từ thuộc chủ đề "${topic}"`);
+    } catch(e) {
+      console.error(e);
+      toast('❌ Lỗi khi xoá từ vựng đám mây!');
+    }
+  } else {
+    VOCAB = VOCAB.filter(w => w.topic !== topic);
+    saveVocabLocal();
+    toast(`🗑️ Đã xoá toàn bộ ${wordsToDelete.length} từ thuộc chủ đề "${topic}"`);
+  }
+  
+  setTopic(''); 
+  updateTopbar();
+}
+
+document.addEventListener('click',e=>{
+  if(e.target===document.getElementById('editModal')) closeEdit();
+  if(e.target===document.getElementById('confirmModal')) {
+        document.getElementById('confirmModal').classList.remove('show');
+        if(resolveConfirm) resolveConfirm(false);
+  }
+  if(e.target===document.getElementById('importModal')) closeImportModal();
+});
 
 // ═══════════════════════════════════════
 // IMPORT / EXPORT (SMART PARSER)
@@ -1438,61 +1663,96 @@ function exportVocab(){
   toast('💾 Đã xuất '+VOCAB.length+' từ');
 }
 
-function importJSON(file){
-  if(!file)return;
-  const r=new FileReader();
-  r.onload=e=>{
-    try{
-      let text = e.target.result.trim();
-      
-      // Smart parser cho file .js: Lọc bỏ các phần khai báo biến Javascript
-      text = text.replace(/^(?:const|let|var|export\s+default|export\s+const)\s+\w*\s*=?\s*/, '');
-      if (text.endsWith(';')) text = text.slice(0, -1);
-
-      let data;
-      try {
-        data = JSON.parse(text); // Ưu tiên parse JSON chuẩn
-      } catch(err) {
-        // Fallback: Xử lý dạng Object Javascript
-        data = new Function("return " + text)();
-      }
-
-      const words = Array.isArray(data) ? data : (data.vocab || data.words || []);
-      if (!words.length) { toast('❌ Không có từ vựng trong file'); return; }
-      
-      // Smart Topic Extractor: Lấy tên file làm chủ đề
-      let baseName = file.name.replace(/\.(js|json)$/i, '');
-      let fileTopic = baseName.charAt(0).toUpperCase() + baseName.slice(1).toLowerCase();
-
-      let added=0;
-      const existing=new Set(VOCAB.map(w=>w.word+'|'+w.topic));
-      
-      words.forEach(w=>{
-        if(!w.word||!w.meaning)return;
-        w.topic = w.topic || fileTopic; // Gán topic từ tên file nếu chưa có
-        if(!w.id) w.id='w_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-        
-        if(!existing.has(w.word+'|'+w.topic)){
-          VOCAB.push(w);
-          added++;
-        }
-      });
-      
-      saveVocabLocal();
-      renderWordTable();
-      renderTopics();
-      updateTopbar();
-      checkAchievements();
-      toast(`✅ +${added} từ mới (Chủ đề: ${fileTopic}) · Tổng ${VOCAB.length} từ`);
-    }catch(err){
-      toast('❌ File lỗi: '+err.message);
-    }
-  };
-  r.readAsText(file,'utf-8');
+function openImportModal() {
+  document.getElementById('import-topic').value = window.S.activeTopic || '';
+  document.getElementById('import-text').value = '';
+  document.getElementById('import-file').value = '';
+  document.getElementById('importModal').classList.add('show');
 }
 
+function closeImportModal() {
+  document.getElementById('importModal').classList.remove('show');
+}
+
+// Lõi xử lý dữ liệu chung cho cả Text và File
+async function processImportData(text, fallbackTopic) {
+  try {
+    let cleanText = text.trim();
+    cleanText = cleanText.replace(/^(?:const|let|var|export\s+default|export\s+const)\s+\w*\s*=?\s*/, '');
+    if (cleanText.endsWith(';')) cleanText = cleanText.slice(0, -1);
+
+    let data;
+    try { data = JSON.parse(cleanText); } 
+    catch(err) { data = new Function("return " + cleanText)(); }
+
+    const words = Array.isArray(data) ? data : (data.vocab || data.words || []);
+    if (!words.length) { toast('❌ Không có từ vựng trong nội dung'); return false; }
+    
+    let added = 0;
+    
+    if (currentUser) {
+        toast('⏳ Đang import từ vựng, vui lòng đợi...');
+        for (const w of words) {
+            if(!w.word || !w.meaning) continue;
+            // Ép chủ đề nếu người dùng có nhập, nếu không lấy của file
+            w.topic = document.getElementById('import-topic').value.trim() || w.topic || fallbackTopic; 
+            if(!w.id) w.id = 'w_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+            
+            const existing = new Set(VOCAB.map(x => x.word + '|' + x.topic));
+            if(!existing.has(w.word + '|' + w.topic)){
+                const toSave = { ...w };
+                delete toSave.id;
+                await setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'vocab', w.id), toSave);
+                added++;
+            }
+        }
+    } else {
+        words.forEach(w => {
+          if(!w.word || !w.meaning) return;
+          w.topic = document.getElementById('import-topic').value.trim() || w.topic || fallbackTopic; 
+          if(!w.id) w.id = 'w_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+          
+          const existing = new Set(VOCAB.map(x => x.word + '|' + x.topic));
+          if(!existing.has(w.word + '|' + w.topic)){
+            VOCAB.push(w);
+            added++;
+          }
+        });
+        saveVocabLocal();
+        initialRender();
+    }
+    
+    let finalTopic = document.getElementById('import-topic').value.trim() || fallbackTopic || 'Tự động';
+    toast(`✅ +${added} từ mới (Chủ đề: ${finalTopic})`);
+    return true;
+  } catch(err) {
+    toast('❌ File/Text lỗi: ' + err.message);
+    return false;
+  }
+}
+
+async function importPastedData() {
+  const text = document.getElementById('import-text').value;
+  if(!text) { toast('⚠️ Vui lòng dán dữ liệu vào ô trống'); return; }
+  const success = await processImportData(text, "Imported Data");
+  if (success) closeImportModal();
+}
+
+async function importFile(file) {
+  if(!file) return;
+  const r = new FileReader();
+  r.onload = async (e) => {
+    let baseName = file.name.replace(/\.(js|json)$/i, '');
+    let fileTopic = baseName.charAt(0).toUpperCase() + baseName.slice(1).toLowerCase();
+    const success = await processImportData(e.target.result, fileTopic);
+    if (success) closeImportModal();
+  };
+  r.readAsText(file, 'utf-8');
+}
+
+
 // ═══════════════════════════════════════
-// LOCAL STORAGE
+// LOCAL STORAGE & STATE (FALLBACK)
 // ═══════════════════════════════════════
 function saveVocabLocal(){try{localStorage.setItem('vl_vocab_v3',JSON.stringify(VOCAB))}catch(e){}}
 function loadVocabLocal(){
@@ -1501,8 +1761,20 @@ function loadVocabLocal(){
     if(v){const p=JSON.parse(v);if(p.length){VOCAB.length=0;VOCAB.push(...p)}}
   }catch(e){}
 }
-function saveState(){
-  try{localStorage.setItem('vl_state_v3',JSON.stringify({streak:S.streak,learned:S.learned,acc:S.acc,reviews:S.reviews,dailyProgress:S.dailyProgress}))}catch(e){}
+async function saveState(){
+  if (currentUser) {
+      try {
+          await setDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'settings', 'state'), {
+              streak: S.streak,
+              learned: S.learned,
+              acc: S.acc,
+              reviews: S.reviews,
+              dailyProgress: S.dailyProgress
+          });
+      } catch(e) { console.error("Lỗi khi lưu state", e); }
+  } else {
+      try{localStorage.setItem('vl_state_v3',JSON.stringify({streak:S.streak,learned:S.learned,acc:S.acc,reviews:S.reviews,dailyProgress:S.dailyProgress}))}catch(e){}
+  }
 }
 function loadState(){
   try{
@@ -1520,7 +1792,6 @@ function scheduleReview(id,rating){
   const ints={again:10*60*1000,hard:86400000,good:3*86400000,easy:7*86400000};
   S.reviews[id]={next:now+ints[rating],rating,ef:calcEF(S.reviews[id]?.ef||2.5,rating)};
   S.learned=Object.keys(S.reviews).length;
-  // daily progress
   const today=new Date().toDateString();
   S.dailyProgress[today]=(S.dailyProgress[today]||0)+1;
   saveState();updateTopbar();checkAchievements();
@@ -1531,7 +1802,6 @@ function calcEF(ef,rating){
 }
 function recordAcc(correct){
   S.acc.total++;if(correct)S.acc.correct++;
-  // streak
   const today=new Date().toDateString();
   if(localStorage.getItem('vl_day')!==today){
     S.streak++;localStorage.setItem('vl_day',today);
@@ -1558,9 +1828,20 @@ function showFCCard(){
   if(!w){finishFC();return}
   S.fc.flipped=false;
   const scene=document.getElementById('fc-scene');
+  const card3d=scene.querySelector('.card-3d');
+  
+  // Tắt hiệu ứng xoay tạm thời để thẻ lật về mặt trước ngay lập tức
+  // Điều này tránh việc bị lộ nghĩa của từ tiếp theo trong lúc thẻ đang xoay
+  card3d.style.transition = 'none';
   scene.classList.remove('flipped');
+  void card3d.offsetWidth; // Ép trình duyệt cập nhật giao diện ngay
+  card3d.style.transition = ''; // Bật lại hiệu ứng xoay cho những lần bấm sau
+  
+  scene.classList.remove('pop-in');
+  void scene.offsetWidth;
   scene.classList.add('pop-in');
   setTimeout(()=>scene.classList.remove('pop-in'),300);
+  
   document.getElementById('fc-word').textContent=w.word;
   document.getElementById('fc-pron').textContent=w.pron||'';
   document.getElementById('fc-mean').textContent=w.meaning;
@@ -1592,7 +1873,6 @@ function finishFC(){
   document.getElementById('fc-shell').style.display='none';
   document.getElementById('fc-result').classList.add('show');
 }
-// Space to flip
 document.addEventListener('keydown',e=>{
   if(e.code==='Space'&&document.getElementById('page-flashcard').classList.contains('active')){
     e.preventDefault();flipFC();
@@ -1707,7 +1987,6 @@ function tryMatchMT(){
   const lEl=document.getElementById('ml_'+S.mt.selL);
   const rEl=document.getElementById('mr_'+S.mt.selR);
   if(S.mt.selL===S.mt.selR){
-    // correct match
     sfxMatch();
     [lEl,rEl].forEach(el=>{el.classList.remove('selected');el.classList.add('matched');el.classList.add('glow')});
     const pair=S.mt.pairs.find(p=>p.id===S.mt.selL);
@@ -1719,7 +1998,6 @@ function tryMatchMT(){
     S.mt.selL=null;S.mt.selR=null;
     if(S.mt.matched>=S.mt.total)setTimeout(finishMT,500);
   }else{
-    // wrong
     sfxWrong();S.mt.wrong++;
     [lEl,rEl].forEach(el=>{el.classList.add('shake')});
     setTimeout(()=>{
@@ -1973,20 +2251,21 @@ function renderAchievements(){
   }).join('');
 }
 
+// Gắn các hàm tương tác với giao diện vào window để HTML có thể gọi
+Object.assign(window, {
+  go, toggleSidebar, closeSidebar, toggleDark, setTopic, renderWordTable,
+  toggleAddForm, addNewWord, openEdit, closeEdit, saveEdit, deleteWord, deleteEditWord, deleteTopicWords,
+  exportVocab, importPastedData, importFile, openImportModal, closeImportModal, speak, addRipple, startFC, flipFC, speakFC, ansFC,
+  startQZ, ansQZ, nextQZ, startMT, selectMTL, selectMTR, startFB, checkFB, nextFB,
+  startLS, playLS, ansLS, nextLS, startTP, checkTP, showTPHint, nextTP
+});
+
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
 document.addEventListener('DOMContentLoaded',()=>{
   initTheme();
-  loadVocabLocal();
-  loadState();
-  renderTopics();
-  renderWordTable();
-  updateTopbar();
-  renderProgressChart();
-  updateModeWordCount();
-  checkAchievements();
-  // Request notification permission
+  initFirebase();
   if('Notification'in window&&Notification.permission==='default'){
     setTimeout(()=>Notification.requestPermission(),3000);
   }
